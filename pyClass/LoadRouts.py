@@ -3,9 +3,11 @@ import pandas as pd
 import math as MT
 import time as tm
 from collections import defaultdict
+from shapely.geometry import LinearRing, LineString, Polygon
 # Mis modulos
 import InputRead_w_cuts as inFile
 import Sqlite.Consult as Conq
+import Calcs as calc
 
 
 class CatalogLine:
@@ -113,10 +115,41 @@ class CatalogLine:
         ArrResult = np.delete(ArrResult, 0, axis=0)
         return ArrResult
 
+    def Cut_Cent(self):
+        Cuts = self.DataPoly
+        Coord = np.array(Cuts)
+        data = Coord[np.where(Coord[:,7] == "Cut")] # Filtro solo los cortes
+        filtro = np.unique(data[:,4], axis = 0) # valor = 2. Revisar orden de datos!
+        data_i = [data[:,:3][np.where(data[:,4] == filtro[i])] for i in range(0,len(filtro))] # Coordenadas por cortes
+
+        a = 0 #contador de coordenadas
+        s = 0
+        b = np.zeros(3) #array de resultados
+
+        for a in range(0, len(filtro)):
+            s = np.array(data_i[a], dtype=np.float64)
+            test = calc.Calculations(s)
+            b = np.vstack((b,test.centroid())) 
+
+        b = np.delete(b, 0, axis=0) # Se eliminan los ceros y se convierte en el array con los centroides calculados (x,y,z)
+
+        data_i2 = [data[:,range(3,10,1)][np.where(data[:,4] == filtro[i])] for i in range(0,len(filtro))] # Datos por cortes
+        data_i2 = np.array(data_i2) # los convierto en np array
+        filtro2 = np.array([1]*len(filtro)) # indice de unos para la extracción de los datos del corte   
+
+        data_i3 = data_i2[np.arange(data_i2.shape[0]),filtro2,:] # datos de los cortes
+        data_i3[:,-3] = 'Point' # cambiando el Element_type a 'Point'
+        data_i3[:,-5] = 'Centroid' # cambiando el Atrib a 'Centroid'
+
+        c = np.concatenate([b,data_i3], axis = 1)
+
+        g = Conq.LoadData('2020v2', 'Test_1')
+        g.LoadRoads(c)
+
 
 aa = tm.time()
 Obj = CatalogLine(1, "Test_1")
-Orden = Obj.RevPoly()
+Orden = Obj.Cut_Cent()
 bb = tm.time()
 print(bb-aa)
 
